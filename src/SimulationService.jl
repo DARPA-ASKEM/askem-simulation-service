@@ -19,7 +19,7 @@ import JSON3
 import JSONSchema
 import LinearAlgebra: norm
 import MathML
-import ModelingToolkit: @parameters, substitute, Differential, Num, @variables, ODESystem, ODEProblem, ODESolution, structural_simplify, states, observed, parameters
+import ModelingToolkit: @parameters, substitute, Differential, Num, @variables, ODESystem, ODEProblem, ODESolution, structural_simplify, unknowns, observed, parameters
 import OpenAPI
 import Oxygen
 import Pkg
@@ -128,7 +128,6 @@ function start!(; host=HOST[], port=PORT[], kw...)
     JobSchedulers.set_scheduler(max_cpu=JobSchedulers.SCHEDULER_MAX_CPU, max_mem=0.5, update_second=0.05, max_job=5000)
     Oxygen.resetstate()
 
-
     Oxygen.@get     "/model-equation/{id}"  model_equation
 
     Oxygen.@get     "/health"               health
@@ -234,6 +233,16 @@ function model_equation(::HTTP.Request, id::String)
         return HTTP.Response(500, "/model-equation failure.  Server error: $error_string")
     end
     return Dict([(:latex, model_latex.s)])
+end
+
+# POST /model-equation
+function modelToEquation(req::HTTP.Request)
+    amrJSON = JSON3.read(req.body)
+    sys = amr_get(amrJSON, ODESystem)
+    model_latex = latexify(sys)
+    return Dict([
+        (:latex, model_latex.s)
+    ])
 end
 
 
@@ -424,7 +433,7 @@ end
 function publish_to_rabbitmq(content)
     if !RABBITMQ_ENABLED[]
         # stop printing content for now, getting to be too much
-        @warn "RabbitMQ disabled - `publish_to_rabbitmq`" # with content $(JSON3.write(content))"
+        @warn "RabbitMQ disabled - `publish_to_rabbitmq`" #with content $(JSON3.write(content))"
         return content
     end
     json = Vector{UInt8}(codeunits(JSON3.write(content)))
@@ -457,9 +466,9 @@ function get_model(id::String)
     @assert ENABLE_TDS[]
     @info "get_model($(repr(id)))"
 
-    tds_url = "$(TDS_URL[])/model-configurations/$id"
+    tds_url = "$(TDS_URL[])/model-configurations/as-configured-model/$id"
 
-    JSON3.read(HTTP.get(tds_url, [basic_auth_header[], json_content_header, snake_case_header]).body).configuration
+    JSON3.read(HTTP.get(tds_url, [basic_auth_header[], json_content_header, snake_case_header]).body)
 end
 
 function get_dataset(obj::JSON3.Object)
