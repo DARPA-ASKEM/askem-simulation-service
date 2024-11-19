@@ -245,6 +245,17 @@ function modelToEquation(req::HTTP.Request)
     ])
 end
 
+# POST /model-equation
+function modelEquation(request::HTTP.Request)
+    model_json = JSON3.read(IOBuffer(HTTP.payload(request)))
+    sys = amr_get(model_json, ODESystem)
+    model_latex = latexify(sys)
+    return Dict([
+        (:latex, model_latex.s)
+    ])
+end
+
+
 
 #-----------------------------------------------------------------------------# health: GET /
 function health(::HTTP.Request)
